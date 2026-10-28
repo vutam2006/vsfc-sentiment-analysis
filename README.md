@@ -5,3 +5,4 @@ Giảng viên hướng dẫn: Đỗ Tuấn Anh
 
 ## Mục tiêu
 Phân loại câu phản hồi thành tích cực / trung tính / tiêu cực.
+Phân loại chủ đề của câu phản hồi giảng viên / chương trình học / cơ sở vật chất / khác.
