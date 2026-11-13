@@ -28,11 +28,15 @@ vsfc-sentiment-analysis/
 ├── README.md
 ├── notebooks/
 │   ├── 01_check_env.ipynb
-│   └── 02_eda.ipynb
+│   ├── 02_eda.ipynb
+│   └── 03_preprocess.ipynb
+├── src/
+│   └── preprocess.py
 └── results/
     ├── fig_sentiment_dist.png
     ├── fig_length_hist.png
-    └── fig_length_by_sentiment.png
+    ├── fig_length_by_sentiment.png
+    └── preprocess_log.md
 ```
 
 ## Danh sách notebook
@@ -41,7 +45,7 @@ vsfc-sentiment-analysis/
 |---|---|---|
 | `01_check_env` | Cài môi trường, tải dữ liệu | Xong |
 | `02_eda.ipynb` | Khảo sát dữ liệu: phân bố nhãn, độ dài câu, từ đặc trưng theo lớp, câu có từ nối đối lập | Xong (khảo sát sơ bộ) |
-| `03_preprocessing.ipynb` | Tiền xử lý, tách từ | Chưa |
+| `03_preprocess.ipynb` | Tiền xử lý, tách từ VnCoreNLP, tạo `data_clean.csv` | Xong |
 | `04_ml_baseline.ipynb` | ML truyền thống | Chưa |
 | `05_bilstm.ipynb` | BiLSTM | Chưa |
 | `06_phobert.ipynb` | Fine-tune PhoBERT | Chưa |
@@ -68,6 +72,7 @@ data/
 Dòng thứ *i* trong `sents.txt` ứng với dòng thứ *i* trong `sentiments.txt` của cùng split.
 
 Lưu ý:
+- Notebook 03 cần thêm `py_vncorenlp` và Java (Colab đã có sẵn Java), model VnCoreNLP được tải tự động ở lần chạy đầu.
 - Nếu đổi tên thư mục trên Drive, sửa biến `PROJECT` trong notebook.
 - Nếu `gdown` báo lỗi quota, đợi một lúc rồi chạy lại.
 
@@ -83,6 +88,16 @@ Khảo sát sơ bộ để hiểu dữ liệu và chọn tham số cho các bư�
 
 ![Phân bố nhãn](results/fig_sentiment_dist.png)
 ![Phân bố độ dài câu](results/fig_length_hist.png)
+
+## Tiền xử lý (notebook 03)
+
+Toàn bộ luật nằm trong `src/preprocess.py` (`clean_text`, `segment`). Chi tiết từng quyết định và số liệu căn cứ xem `results/preprocess_log.md`.
+
+- `clean_text`: chuẩn hóa NFC, chữ thường, thống nhất dấu thanh về kiểu mới (hoà, thuỷ), chuẩn hóa viết tắt không mơ hồ (ko, đc, trc, ...), đổi emoticon và ký hiệu mà README gốc thay bằng chữ (`colonsad`, `doubledot`, ...) về token chữ cái liền hoặc ký hiệu gốc.
+- `segment`: tách từ bằng VnCoreNLP (từ ghép nối bằng `_`, ví dụ `giảng_viên`), đúng định dạng đầu vào của PhoBERT.
+- Đầu ra `data/data_clean.csv` có 3 cột văn bản: `text_raw` (gốc), `text_clean`, `text_seg`, cùng các cột nhãn. Nhãn và cách chia tập không đổi so với `data_all.csv` (có assert kiểm tra).
+- Giữ cả ba phiên bản văn bản để làm ablation ở các bước huấn luyện.
+- Lưu ý đã biết: dấu thanh kiểu mới có thể làm một số từ bị PhoBERT cắt thành nhiều subword hơn; chưa đo ảnh hưởng.
 
 ## Kết quả mô hình
 
