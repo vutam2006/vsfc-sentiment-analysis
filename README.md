@@ -43,7 +43,7 @@ vsfc-sentiment-analysis/
 
 | Notebook | Nội dung | Trạng thái |
 |---|---|---|
-| `01_check_env` | Cài môi trường, tải dữ liệu | Xong |
+| `01_check_env.ipynb` | Cài môi trường, tải dữ liệu | Xong |
 | `02_eda.ipynb` | Khảo sát dữ liệu: phân bố nhãn, độ dài câu, từ đặc trưng theo lớp, câu có từ nối đối lập | Xong (khảo sát sơ bộ) |
 | `03_preprocess.ipynb` | Tiền xử lý, tách từ VnCoreNLP, tạo `data_clean.csv` | Xong |
 | `04_ml_baseline.ipynb` | ML truyền thống | Chưa |
@@ -52,10 +52,10 @@ vsfc-sentiment-analysis/
 
 ## Hướng dẫn thiết lập (notebook 01)
 
-Chạy trên Google Colab, lần lượt các bước:
+Toàn bộ project chạy trên Google Colab, lưu dữ liệu và kết quả trên Google Drive. Chạy các notebook theo thứ tự 01 → 02 → 03 → ...
 
-1. **Mount Google Drive và tạo thư mục project** tại `MyDrive/project1_vsfc/` gồm `data`, `notebooks`, `checkpoints`, `results`.
-2. **Cài thư viện:** `pip install -q transformers datasets underthesea` (`torch` và `scikit-learn` đã có sẵn trên Colab).
+1. **Mount Google Drive và tạo thư mục project** tại `MyDrive/project1_vsfc/` gồm `data`, `notebooks`, `src`, `checkpoints`, `results`.
+2. **Cài thư viện:** `pip install -q transformers datasets underthesea` (`torch` và `scikit-learn` đã có sẵn trên Colab). `underthesea` chỉ dùng ở notebook 02 để ước lượng sơ bộ độ dài câu.
 3. **Kiểm tra tokenizer PhoBERT:** `AutoTokenizer.from_pretrained("vinai/phobert-base")`. Cảnh báo về `HF_TOKEN` có thể bỏ qua.
 4. **Tải dữ liệu** bằng `gdown --folder` vào thư mục `data/`.
 
@@ -80,24 +80,26 @@ Lưu ý:
 
 Khảo sát sơ bộ để hiểu dữ liệu và chọn tham số cho các bước sau.
 
-- **Quy mô và chất lượng:** 16.175 câu (train 11.426 / dev 1.583 / test 3.166). Không có câu rỗng, không có câu trùng giữa các split (không rò rỉ dữ liệu).
+- **Quy mô và chất lượng:** 16.175 câu (train 11.426 / dev 1.583 / test 3.166). Không có câu rỗng, không có câu trùng giữa các split (không rò rỉ dữ liệu). Chỉ có 1 câu trùng nội dung nhưng khác nhãn, giữ nguyên.
 - **Lệch lớp:** positive 49,7% / negative 46,0% / neutral 4,3% (698 câu). Vì vậy dùng Macro-F1 và sẽ thử class weight.
-- **Độ dài:** trung vị 11 token, p99 là 52. Sau tokenizer PhoBERT, p99 là 39 subword nên chọn `max_length = 128` (PhoBERT) và 64 (BiLSTM).
+- **Độ dài:** trung vị 11 token, p99 là 52 (đếm theo khoảng trắng, gồm cả dấu câu). Độ dài đầu vào chốt cho mô hình được đo lại ở notebook 03.
 - **Theo lớp:** negative dài nhất (trung bình 16,9 token), neutral ngắn nhất (9,8), positive 12,1.
 - **Câu có từ nối đối lập** (nhưng, tuy nhiên, ...): 4,3% tổng số câu, trong đó 76% có nhãn negative.
 
 ![Phân bố nhãn](results/fig_sentiment_dist.png)
 ![Phân bố độ dài câu](results/fig_length_hist.png)
+![Độ dài câu theo lớp cảm xúc](results/fig_length_by_sentiment.png)
 
 ## Tiền xử lý (notebook 03)
 
-Toàn bộ luật nằm trong `src/preprocess.py` (`clean_text`, `segment`). Chi tiết từng quyết định và số liệu căn cứ xem `results/preprocess_log.md`.
+Toàn bộ luật nằm trong `src/preprocess.py` (`clean_text`, `segment`), notebook `03_preprocess.ipynb` tự ghi file này vào Drive khi chạy. Chi tiết từng quyết định và số liệu căn cứ xem `results/preprocess_log.md`.
 
-- `clean_text`: chuẩn hóa NFC, chữ thường, thống nhất dấu thanh về kiểu mới (hoà, thuỷ), chuẩn hóa viết tắt không mơ hồ (ko, đc, trc, ...), đổi emoticon và ký hiệu mà README gốc thay bằng chữ (`colonsad`, `doubledot`, ...) về token chữ cái liền hoặc ký hiệu gốc.
+- `clean_text`: chuẩn hóa NFC, chữ thường, thống nhất dấu thanh về kiểu mới (hoà, thuỷ), chuẩn hóa viết tắt không mơ hồ (ko, đc, trc, ...), đổi các emoticon và ký hiệu mà bộ dữ liệu đã thay bằng chữ (`colonsad`, `doubledot`, ...) về token chữ cái liền (`emosmile`, ...) hoặc ký hiệu gốc (`:`, `...`).
 - `segment`: tách từ bằng VnCoreNLP (từ ghép nối bằng `_`, ví dụ `giảng_viên`), đúng định dạng đầu vào của PhoBERT.
 - Đầu ra `data/data_clean.csv` có 3 cột văn bản: `text_raw` (gốc), `text_clean`, `text_seg`, cùng các cột nhãn. Nhãn và cách chia tập không đổi so với `data_all.csv` (có assert kiểm tra).
 - Giữ cả ba phiên bản văn bản để làm ablation ở các bước huấn luyện.
-- Lưu ý đã biết: dấu thanh kiểu mới có thể làm một số từ bị PhoBERT cắt thành nhiều subword hơn; chưa đo ảnh hưởng.
+- Độ dài đầu vào (đo trên `text_seg`, toàn bộ 16.175 câu, bằng tokenizer PhoBERT): trung vị 11, p99 = 45 subword, tối đa 136. Chọn `max_length = 128` cho PhoBERT (cắt 0,01% câu, tức 1 đến 2 câu) và 64 cho BiLSTM (đếm theo từ nên không vượt quá số subword, cắt dưới 0,21%).
+- Lưu ý đã biết: dấu thanh được thống nhất về kiểu mới (theo kiểu chiếm đa số trong dữ liệu), nhưng PhoBERT được huấn luyện chủ yếu trên văn bản kiểu cũ nên một số từ có thể bị cắt thành nhiều subword hơn. Chưa đo ảnh hưởng, sẽ kiểm tra bằng ablation `text_raw` và `text_clean`.
 
 ## Kết quả mô hình
 
