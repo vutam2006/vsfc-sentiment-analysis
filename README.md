@@ -27,8 +27,12 @@ Repo này không đăng lại dữ liệu, chỉ có notebook để tải về t
 vsfc-sentiment-analysis/
 ├── README.md
 ├── notebooks/
-│   └── 01_check_ev.ipynb
+│   ├── 01_check_env.ipynb
+│   └── 02_eda.ipynb
 └── results/
+    ├── fig_sentiment_dist.png
+    ├── fig_length_hist.png
+    └── fig_length_by_sentiment.png
 ```
 
 ## Danh sách notebook
@@ -36,7 +40,7 @@ vsfc-sentiment-analysis/
 | Notebook | Nội dung | Trạng thái |
 |---|---|---|
 | `01_check_env` | Cài môi trường, tải dữ liệu | Xong |
-| `02_eda.ipynb` | EDA: phân bố nhãn, độ dài câu, từ khóa theo lớp, câu cảm xúc hỗn hợp | Đang làm |
+| `02_eda.ipynb` | Khảo sát dữ liệu: phân bố nhãn, độ dài câu, từ đặc trưng theo lớp, câu có từ nối đối lập | Xong (khảo sát sơ bộ) |
 | `03_preprocessing.ipynb` | Tiền xử lý, tách từ | Chưa |
 | `04_ml_baseline.ipynb` | ML truyền thống | Chưa |
 | `05_bilstm.ipynb` | BiLSTM | Chưa |
@@ -67,6 +71,19 @@ Lưu ý:
 - Nếu đổi tên thư mục trên Drive, sửa biến `PROJECT` trong notebook.
 - Nếu `gdown` báo lỗi quota, đợi một lúc rồi chạy lại.
 
-## Kết quả
+## Kết quả khảo sát dữ liệu (notebook 02)
+
+Khảo sát sơ bộ để hiểu dữ liệu và chọn tham số cho các bước sau.
+
+- **Quy mô và chất lượng:** 16.175 câu (train 11.426 / dev 1.583 / test 3.166). Không có câu rỗng, không có câu trùng giữa các split (không rò rỉ dữ liệu).
+- **Lệch lớp:** positive 49,7% / negative 46,0% / neutral 4,3% (698 câu). Vì vậy dùng Macro-F1 và sẽ thử class weight.
+- **Độ dài:** trung vị 11 token, p99 là 52. Sau tokenizer PhoBERT, p99 là 39 subword nên chọn `max_length = 128` (PhoBERT) và 64 (BiLSTM).
+- **Theo lớp:** negative dài nhất (trung bình 16,9 token), neutral ngắn nhất (9,8), positive 12,1.
+- **Câu có từ nối đối lập** (nhưng, tuy nhiên, ...): 4,3% tổng số câu, trong đó 76% có nhãn negative.
+
+![Phân bố nhãn](results/fig_sentiment_dist.png)
+![Phân bố độ dài câu](results/fig_length_hist.png)
+
+## Kết quả mô hình
 
 *(Sẽ cập nhật sau khi hoàn thành các thí nghiệm.)*
