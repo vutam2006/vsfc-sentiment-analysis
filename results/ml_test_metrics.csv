@@ -1,0 +1,2 @@
+﻿model,split,macro_f1,accuracy,P_negative,R_negative,F1_negative,P_neutral,R_neutral,F1_neutral,P_positive,R_positive,F1_positive
+TFIDF-uni + SVM (balanced),test,0.7399,0.8756,0.8847,0.9099,0.8971,0.3762,0.4551,0.4119,0.9333,0.8893,0.9108

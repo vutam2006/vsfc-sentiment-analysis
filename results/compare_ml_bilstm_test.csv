@@ -1,0 +1,7 @@
+﻿,SVM balanced,BiLSTM (TB 5 seed),Chênh (BiLSTM - SVM)
+macro_f1,0.7399,0.7637,0.0238
+accuracy,0.8756,0.8923,0.0167
+F1_negative,0.8971,0.9127,0.0156
+F1_neutral,0.4119,0.4545,0.0426
+F1_positive,0.9108,0.9239,0.0131
+R_neutral,0.4551,0.4874,0.0323
