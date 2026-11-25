@@ -11,7 +11,7 @@ Phân loại câu phản hồi của sinh viên thành 3 lớp: tiêu cực / tr
 
 - Mô hình ML truyền thống: TF-IDF + Logistic Regression / Linear SVM / Naive Bayes
 - BiLSTM
-- PhoBERT (`vinai/phobert-base`), chưa thực hiện
+- PhoBERT (`vinai/phobert-base`), fine-tune trên văn bản đã tách từ
 
 Metric chính: **Macro-F1**, kèm Precision / Recall / F1 từng lớp và ma trận nhầm lẫn. Dùng Macro-F1 vì lớp trung tính chỉ chiếm khoảng 4%, nên Accuracy dễ cho điểm cao dù mô hình gần như bỏ qua lớp này.
 
@@ -23,15 +23,16 @@ Mô hình được chọn và cấu hình được cố định bằng tập dev
 |---|---|---|---|---|---|
 | TF-IDF + SVM (class_weight balanced) | 0,7399 | 0,8756 | 0,8971 | 0,4119 | 0,9108 |
 | BiLSTM (trung bình ± độ lệch chuẩn, 5 seed) | 0,7637 ± 0,0068 | 0,8923 ± 0,0080 | 0,9127 ± 0,0063 | 0,4545 ± 0,0119 | 0,9239 ± 0,0030 |
-| PhoBERT | chưa chạy | | | | |
+| PhoBERT (trung bình ± độ lệch chuẩn, 5 seed) | **0,8393 ± 0,0053** | 0,9384 ± 0,0020 | 0,9556 ± 0,0021 | 0,6074 ± 0,0133 | 0,9549 ± 0,0017 |
 
 Nhận xét:
 
 - BiLSTM cao hơn SVM 0,0238 Macro-F1, và cả 5 seed (thấp nhất 0,7544) đều cao hơn SVM. Mức chênh này nhỏ và sát ngưỡng 0,02 đặt trước khi xem kết quả; SVM là baseline chưa tinh chỉnh (C = 1, chỉ unigram) nên chưa nên kết luận mạnh hơn "BiLSTM nhỉnh hơn nhẹ".
-- Hai lớp tiêu cực và tích cực đạt F1 khoảng 0,90 đến 0,92 ở cả hai mô hình. Điểm yếu nằm ở lớp trung tính: F1 chỉ khoảng 0,41 đến 0,45; SVM đoán sai 91/167 câu trung tính, BiLSTM sai trung bình 85,6/167 câu.
+- PhoBERT cao hơn BiLSTM 0,0756 và cao hơn SVM 0,0994 Macro-F1, cả hai mức chênh đều vượt xa ngưỡng 0,02 đặt trước khi xem kết quả. Cả 5 seed của PhoBERT (thấp nhất 0,8332) đều cao hơn mọi seed của BiLSTM (cao nhất 0,7718), nên có thể viết là PhoBERT tốt hơn rõ rệt trong thiết lập này.
+- Hai lớp tiêu cực và tích cực đạt F1 khoảng 0,90 đến 0,92 ở SVM và BiLSTM, và khoảng 0,955 ở PhoBERT. Điểm yếu vẫn nằm ở lớp trung tính: F1 là 0,41 (SVM), 0,45 (BiLSTM) và 0,61 (PhoBERT). Số câu trung tính bị đoán sai trên 167 câu test: 91 (SVM), 85,6 (BiLSTM), 74,0 (PhoBERT). Với PhoBERT, câu trung tính bị nhầm sang tích cực (26,3%) nhiều hơn sang tiêu cực (18,0%).
 - Lớp trung tính chỉ có 167 câu ở test, nên F1 lớp này dao động mạnh. Chênh lệch Macro-F1 dưới 0,02 giữa hai mô hình nên được đọc là "tương đương".
 
-Ma trận nhầm lẫn: `results/fig_cm_ml_best_test.png` (SVM) và `results/fig_cm_bilstm_test.png` (BiLSTM, trung bình 5 seed). Bảng chi tiết: `results/ml_test_metrics.csv`, `results/bilstm_test_metrics.csv`, `results/compare_ml_bilstm_test.csv`.
+Ma trận nhầm lẫn: `results/fig_cm_ml_best_test.png` (SVM), `results/fig_cm_bilstm_test.png` (BiLSTM, trung bình 5 seed) và `results/fig_cm_phobert_test.png` (PhoBERT, trung bình 5 seed). Bảng chi tiết: `results/ml_test_metrics.csv`, `results/bilstm_test_metrics.csv`, `results/compare_ml_bilstm_test.csv`, `results/phobert_test_metrics.csv`.
 
 ## Dữ liệu
 
@@ -112,11 +113,39 @@ Precision / Recall / F1 từng lớp trên test (trung bình 5 seed):
 | Trung tính | 0,4363 | 0,4874 | 0,4545 |
 | Tích cực | 0,9314 | 0,9167 | 0,9239 |
 
+### 06 - PhoBERT
+
+- Mô hình `vinai/phobert-base` (135.000.579 tham số) thêm đầu phân loại 3 lớp. Đầu vào là cột `text_seg` (đã tách từ), `MAX_LEN = 128` (chỉ cắt 2 câu trên 16.175 câu), đệm động theo batch 32.
+- Huấn luyện: cross-entropy có trọng số lớp (cùng công thức với BiLSTM: 0,715 / 8,316 / 0,675), AdamW với learning rate 2e-5 và weight decay 0,01 (không áp dụng cho bias và LayerNorm), warmup 10% rồi giảm tuyến tính, cắt gradient ở 1,0, tính toán fp16. Tối đa 5 epoch, dừng sớm theo Macro-F1 trên dev với patience 2, giữ checkpoint của epoch tốt nhất.
+- Chạy 5 seed (42 đến 46), mỗi epoch khoảng 43 giây, tổng khoảng 16 phút cho 5 seed trên GPU của Colab. Các siêu tham số dùng giá trị phổ biến và được chốt trước khi chấm test, không tinh chỉnh.
+
+| Seed | Epoch tốt nhất | Macro-F1 (dev) | Macro-F1 (test) |
+|---|---|---|---|
+| 42 | 4 | 0,8765 | 0,8388 |
+| 43 | 2 | 0,8629 | 0,8332 |
+| 44 | 4 | 0,8705 | 0,8454 |
+| 45 | 2 | 0,8674 | 0,8438 |
+| 46 | 2 | 0,8708 | 0,8353 |
+| **TB ± std** | | 0,8696 ± 0,0050 | 0,8393 ± 0,0053 |
+
+Điểm test thấp hơn dev khoảng 0,03 vì epoch được chọn theo dev và lớp trung tính ở dev chỉ có 73 câu; vì vậy so sánh giữa các mô hình dùng điểm test.
+
+Precision / Recall / F1 từng lớp trên test (trung bình 5 seed):
+
+| Lớp | Precision | Recall | F1 |
+|---|---|---|---|
+| Tiêu cực | 0,9437 | 0,9678 | 0,9556 |
+| Trung tính | 0,6687 | 0,5569 | 0,6074 |
+| Tích cực | 0,9574 | 0,9525 | 0,9549 |
+
+Learning curve: `results/fig_phobert_curve_s42.png` (seed 42) và `results/fig_phobert_curve_all_seeds.png` (cả 5 seed).
+
 ## Hạn chế
 
 - Lớp trung tính quá ít (698 câu, 4,3%): F1 lớp này thấp và dao động mạnh, nhất là ở dev (73 câu) và test (167 câu).
-- Độ lệch chuẩn giữa các seed (khoảng 0,007) chỉ phản ánh dao động do khởi tạo, chưa phản ánh sai số do kích thước tập test. Mỗi cấu hình chỉ chấm trên một lần chia train / dev / test cố định.
-- Baseline ML chưa được tinh chỉnh (chỉ unigram, tham số mặc định); BiLSTM chọn epoch bằng dev. So sánh giữa hai mô hình vì thế mang tính tham khảo.
+- Độ lệch chuẩn giữa các seed (khoảng 0,005 đến 0,007) chỉ phản ánh dao động do khởi tạo và thứ tự dữ liệu, chưa phản ánh sai số do kích thước tập test. Mỗi cấu hình chỉ chấm trên một lần chia train / dev / test cố định.
+- Baseline ML chưa được tinh chỉnh (chỉ unigram, tham số mặc định); BiLSTM và PhoBERT chọn epoch bằng dev. PhoBERT dùng mô hình đã tiền huấn luyện và văn bản đã tách từ (`text_seg`), còn SVM và BiLSTM dùng `text_clean` chưa tách từ, nên mức chênh phản ánh cả lợi ích của tiền huấn luyện lẫn khác biệt đầu vào; so sánh giữa các mô hình vì thế mang tính tham khảo.
+- Huấn luyện PhoBERT trên GPU với fp16 không tái lập chính xác từng chữ số: chạy lại seed 42 với cùng cấu hình cho Macro-F1 dev 0,8701 và 0,8765. Các kết quả báo cáo ứng với lần chạy sau (0,8765).
 - Dữ liệu có nhiễu nhãn (câu rất ngắn, câu chứa từ nối đối lập). Đây là giới hạn của bộ dữ liệu, không phải của mô hình.
 - Bảng viết tắt trong `src/preprocess.py` rộng hơn nhu cầu của dữ liệu này (dữ liệu gần như không có viết tắt). Nếu dùng hàm này cho văn bản mới, cần rà lại bảng viết tắt trước.
 
@@ -130,7 +159,8 @@ vsfc-sentiment-analysis/
 │   ├── 02_eda.ipynb
 │   ├── 03_preprocess.ipynb
 │   ├── 04_ml_baseline.ipynb
-│   └── 05_bilstm.ipynb
+│   ├── 05_bilstm.ipynb
+│   └── 06_phobert.ipynb
 ├── src/
 │   └── preprocess.py
 └── results/
@@ -143,7 +173,11 @@ vsfc-sentiment-analysis/
     ├── fig_cm_ml_best_test.png
     ├── bilstm_test_metrics.csv
     ├── compare_ml_bilstm_test.csv
-    └── fig_cm_bilstm_test.png
+    ├── fig_cm_bilstm_test.png
+    ├── phobert_test_metrics.csv
+    ├── fig_cm_phobert_test.png
+    ├── fig_phobert_curve_s42.png
+    └── fig_phobert_curve_all_seeds.png
 ```
 
 ## Danh sách notebook
@@ -155,15 +189,15 @@ vsfc-sentiment-analysis/
 | `03_preprocess.ipynb` | Tiền xử lý, tách từ VnCoreNLP, tạo `data_clean.csv` | Xong |
 | `04_ml_baseline.ipynb` | Baseline ML: TF-IDF + LR / SVM / NB, chọn mô hình bằng dev, chấm test một lần | Xong |
 | `05_bilstm.ipynb` | BiLSTM, 5 seed, so sánh với SVM trên test | Xong |
-| `06_phobert.ipynb` | Fine-tune PhoBERT | Chưa |
+| `06_phobert.ipynb` | Fine-tune PhoBERT trên `text_seg`, 5 seed, chọn epoch bằng dev, chấm test một lần | Xong |
 
 ## Cách chạy
 
 Các notebook viết cho Google Colab, lưu dữ liệu và kết quả trong Google Drive tại `MyDrive/project1_vsfc/` (thư mục `data`, `notebooks`, `src`, `results`).
 
-1. Chạy lần lượt `01` đến `05`; mỗi notebook đọc đầu ra của notebook trước (`data_all.csv`, `data_clean.csv`, `ml_test_metrics.csv`).
+1. Chạy lần lượt `01` đến `06`; mỗi notebook đọc đầu ra của notebook trước (`data_all.csv`, `data_clean.csv`, `ml_test_metrics.csv`).
 2. `01` cài thư viện và tải dữ liệu. `03` cần Java và `py_vncorenlp` để tách từ (Colab có sẵn Java; mô hình VnCoreNLP được tải tự động mỗi phiên).
-3. `05` nên chạy với GPU (Runtime → Change runtime type → GPU).
+3. `05` và `06` cần GPU (Runtime → Change runtime type → GPU). `06` lưu checkpoint tạm tại `/content/ckpt` (khoảng 0,5 GB mỗi seed, không đưa lên Drive hay GitHub); nếu phiên Colab bị ngắt thì phải huấn luyện lại, khoảng 16 phút cho 5 seed.
 4. Thư viện chính: `pandas`, `scikit-learn`, `matplotlib`, `seaborn`, `torch`, `transformers`, `py_vncorenlp`, `underthesea`, `gdown`.
 
 ## Tài liệu tham khảo
